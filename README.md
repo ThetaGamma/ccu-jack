@@ -82,9 +82,18 @@ Um ccu-jack in einem Docker Container laufen zu lassen sind folgende Schritte n√
 
 1. Dockerfile und ggf. docker-compose.yml von github herunterladen
 2. Docker image bauen: 
-   ```docker build -t ccu-jack:latest .```
+
+  ```bash
+   export BUILD_VERSION=$(curl -Ls https://api.github.com/repos/mdzio/ccu-jack/releases/latest | grep -oP '"tag_name": "v\K(.*)(?=")')
+   
+   docker build --rm --no-cache \
+    --build-arg BUILD_VERSION="${BUILD_VERSION}" \
+    --build-arg BUILD_DATE="$(date +"%Y-%m-%dT%H:%M:%SZ")" \
+    --tag ccu-jack:latest --tag ccu-jack:${BUILD_VERSION} .
+  ```
+
 3.  a) direkt √ºber docker laufen lassen:
-   ```docker run --rm  -v "$PWD"/ccu-jack.cfg:/go/src/app/ccu-jack.cfg:ro ccu-jack:latest```
+   ```docker run --rm  -v "$PWD"/ccu-jack.cfg:/app/ccu-jack.cfg:ro ccu-jack:latest```
 
     b) oder mit docker-compose: ```docker-compose up -d .```
 

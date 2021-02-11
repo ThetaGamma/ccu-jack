@@ -1,16 +1,17 @@
-# V0.4
-# # with build, download latest release from github
-# use "stable" release from mdzio
-#
 # 1. build the image with
-#   docker build -t ccu-jack:latest .
+#   export BUILD_VERSION=$(curl -Ls https://api.github.com/repos/mdzio/ccu-jack/releases/latest | grep -oP '"tag_name": "v\K(.*)(?=")')
+#   docker build --rm --no-cache \
+#    --build-arg BUILD_VERSION="${BUILD_VERSION}" \
+#    --build-arg BUILD_DATE="$(date +"%Y-%m-%dT%H:%M:%SZ")" \
+#    --tag ccu-jack:latest --tag ccu-jack:${BUILD_VERSION} .
+#
 # 2. mount your config into container and run the image, i.e.
-# 
-#   docker run --rm  -v "$PWD"/wd/ccu-jack.cfg:/go/src/app/ccu-jack.cfg:ro ccu-jack:latest
-FROM golang:1.15-alpine as builder
+#   docker run --rm -v ./etc/ccu-jack/ccu-jack.cfg:/app/ccu-jack.cfg ccu-jack:latest
+
+FROM alpine
 
 ARG BUILD_DATE
-ARG BUILD_VERSION=1.0.1
+ARG BUILD_VERSION
 
 LABEL org.opencontainers.image.created=$BUILD_DATE \
       org.opencontainers.image.version=$BUILD_VERSION \
@@ -23,19 +24,17 @@ LABEL org.opencontainers.image.created=$BUILD_DATE \
       org.opencontainers.image.documentation="https://github.com/mdzio/ccu-jack/blob/master/README.md"
 
 # Set work directory
-WORKDIR /go/src/app
+WORKDIR /app
+
 # Get the latest relase from github and extract it locally
 RUN apk add --no-cache curl && \
     curl -SL "https://github.com/mdzio/ccu-jack/releases/download/v${BUILD_VERSION}/ccu-jack-linux-${BUILD_VERSION}.tar.gz" | tar -xvzC . && \
-    mkdir -p /go/src/app /data  && \
-    adduser -h /go/src/app -D -H ccu-jack -u 1000 && \
+    mkdir -p /app /data && \
+    adduser -h /app -D -H ccu-jack -u 1000 -s /sbin/nologin && \
     chown -R ccu-jack:root /data && chmod -R g+rwX /data && \
-    chown -R ccu-jack:root /go/src/app && chmod -R g+rwX /go/src/app
+    chown -R ccu-jack:root /app && chmod -R g+rwX /app
 
-FROM scratch as RUN
-WORKDIR /go/src/app
-COPY --from=builder /etc/passwd /etc/passwd
-#USER ccu-jack
+USER ccu-jack
 
 # MQTT, MQTT TLS, CCU-Jack VEAM/UI, CCU-Jack VEAM/UI TLS
 EXPOSE 1883 8883 2121 2122
@@ -43,6 +42,5 @@ EXPOSE 1883 8883 2121 2122
 # Add a healthcheck (default every 30 secs)
 HEALTHCHECK CMD curl -s -o /dev/null -il -w "%{http_code}\n" http://localhost:2121 | grep -Eq "(200|401)" || exit 1
 
-COPY --from=builder /go/src/app/ccu-jack .
-# start it up
+# Start it up
 CMD ["./ccu-jack"]
